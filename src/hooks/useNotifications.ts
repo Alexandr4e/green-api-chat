@@ -1,20 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { deleteNotification, receiveNotification } from '../api/greenApi'
+import { deleteNotification, isAuthError, receiveNotification } from '../api/greenApi'
 import type { Credentials, NotificationBody } from '../types'
 import { getErrorMessage } from '../utils/error'
+import { sleep } from '../utils/retry'
 
 const RECEIVE_TIMEOUT_SEC = 5
 const RETRY_DELAY_MS = 3000
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms)
-    signal.addEventListener('abort', () => {
-      clearTimeout(timer)
-      resolve()
-    })
-  })
-}
 
 /**
  * Получение входящих уведомлений по технологии HTTP API:
@@ -24,12 +15,15 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 export function useNotifications(
   creds: Credentials | null,
   onNotification: (body: NotificationBody) => void,
+  onUnauthorized: () => void,
 ): { error: string | null } {
   const handlerRef = useRef(onNotification)
+  const unauthorizedRef = useRef(onUnauthorized)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     handlerRef.current = onNotification
+    unauthorizedRef.current = onUnauthorized
   })
 
   useEffect(() => {
@@ -52,6 +46,7 @@ export function useNotifications(
           }
         } catch (e) {
           if (signal.aborted) return
+          if (isAuthError(e)) return unauthorizedRef.current()
           setError(getErrorMessage(e))
           await sleep(RETRY_DELAY_MS, signal)
         }

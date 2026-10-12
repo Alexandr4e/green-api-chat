@@ -1,8 +1,9 @@
-// localStorage может быть недоступен (приватный режим, запрет cookies) — тогда работаем без сохранения.
+// Данные (включая apiTokenInstance) хранятся в sessionStorage: переживают перезагрузку страницы,
+// но удаляются при закрытии вкладки. Если хранилище недоступно — работаем без сохранения.
 
 export function loadJson<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = sessionStorage.getItem(key)
     return raw ? (JSON.parse(raw) as T) : null
   } catch {
     return null
@@ -11,7 +12,7 @@ export function loadJson<T>(key: string): T | null {
 
 export function saveJson(key: string, value: unknown): void {
   try {
-    localStorage.setItem(key, JSON.stringify(value))
+    sessionStorage.setItem(key, JSON.stringify(value))
   } catch {
     // игнорируем
   }
@@ -19,7 +20,7 @@ export function saveJson(key: string, value: unknown): void {
 
 export function removeItem(key: string): void {
   try {
-    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
   } catch {
     // игнорируем
   }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { ArrowUpIcon } from './icons'
 
-/** Ограничение длины сообщения в методе sendMessage для Telegram */
-const MAX_LENGTH = 4096
+/** Ограничение длины текста в методе sendMessage */
+const MAX_LENGTH = 4000
 
 interface MessageInputProps {
   onSend: (text: string) => void
@@ -33,7 +34,7 @@ export function MessageInput({ onSend }: MessageInputProps) {
 
   return (
     <div className="composer">
-      <div className="composer__field">
+      <div className="composer__bar">
         <textarea
           ref={inputRef}
           className="composer__input"
@@ -45,12 +46,10 @@ export function MessageInput({ onSend }: MessageInputProps) {
           rows={1}
           maxLength={MAX_LENGTH}
         />
+        <button type="button" className="composer__send" onClick={submit} disabled={!canSend} aria-label="Отправить">
+          <ArrowUpIcon size={18} />
+        </button>
       </div>
-      <button type="button" className="composer__send" onClick={submit} disabled={!canSend} aria-label="Отправить">
-        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-          <path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z" />
-        </svg>
-      </button>
     </div>
   )
 }

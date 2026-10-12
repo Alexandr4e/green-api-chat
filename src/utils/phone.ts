@@ -1,7 +1,8 @@
-/** Оставляет только цифры; 8XXXXXXXXXX (РФ) приводит к 7XXXXXXXXXX. */
+/** Оставляет только цифры; российский 8XXXXXXXXXX без «+» приводит к 7XXXXXXXXXX. */
 export function normalizePhone(input: string): string {
   let digits = input.replace(/\D/g, '')
-  if (digits.length === 11 && digits.startsWith('8')) digits = '7' + digits.slice(1)
+  // с «+» это код страны (например, +84 — Вьетнам), а не российская «восьмёрка»
+  if (!input.trim().startsWith('+') && digits.length === 11 && digits.startsWith('8')) digits = '7' + digits.slice(1)
   return digits
 }
 
@@ -23,8 +24,4 @@ export function formatChatId(chatId: string): string {
     return `+7 ${d.slice(1, 4)} ${d.slice(4, 7)}-${d.slice(7, 9)}-${d.slice(9)}`
   }
   return `+${d}`
-}
-
-export function phoneFromChatId(chatId: string): string | undefined {
-  return chatId.match(/^(\d+)@c\.us$/)?.[1]
 }

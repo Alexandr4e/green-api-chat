@@ -1,26 +1,31 @@
 import { useState, type FormEvent } from 'react'
-import { GreenApiError, getStateInstance } from '../api/greenApi'
+import { GreenApiError, getStateInstance, isAuthError } from '../api/greenApi'
 import type { Credentials } from '../types'
 import { getErrorMessage } from '../utils/error'
+import { LogoIcon } from './icons'
 
 const DEFAULT_API_URL = 'https://api.green-api.com'
 
 interface LoginFormProps {
   onLogin: (creds: Credentials) => void
+  /** Причина, по которой пользователя вернули на форму входа */
+  initialError?: string | null
 }
 
 function describeLoginError(error: unknown): string {
-  if (error instanceof GreenApiError && (error.status === 401 || error.status === 403)) {
+  if (isAuthError(error)) {
     return 'Неверный idInstance или apiTokenInstance'
   }
-  return `Не удалось подключиться: ${getErrorMessage(error)}`
+  if (error instanceof GreenApiError) return `Не удалось подключиться: ${getErrorMessage(error)}`
+  // сервер не ответил (сеть, таймаут): чаще всего у инстанса другой адрес API
+  return 'Не удалось подключиться. Проверьте apiUrl в блоке «Дополнительно» — адрес указан в консоли GREEN-API.'
 }
 
-export function LoginForm({ onLogin }: LoginFormProps) {
+export function LoginForm({ onLogin, initialError = null }: LoginFormProps) {
   const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL)
   const [idInstance, setIdInstance] = useState('')
   const [apiTokenInstance, setApiTokenInstance] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -54,24 +59,19 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   return (
     <div className="login">
       <form className="login__card" onSubmit={handleSubmit} noValidate>
-        <div className="login__logo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="56" height="56">
-            <path
-              fill="currentColor"
-              d="M9.8 15.3 9.6 19c.4 0 .6-.2.8-.4l2-1.9 4.1 3c.8.4 1.3.2 1.5-.7l2.7-12.7c.3-1.1-.4-1.6-1.2-1.3L3.7 10.7c-1.1.4-1.1 1.1-.2 1.4l4.1 1.3 9.6-6c.5-.3.9-.1.5.2"
-            />
-          </svg>
+        <div className="login__logo">
+          <LogoIcon size={72} />
         </div>
-        <h1 className="login__title">Вход в чат</h1>
+        <h1 className="login__title">Войдите через GREEN-API</h1>
         <p className="login__hint">
-          Введите данные инстанса Telegram из{' '}
+          Укажите данные инстанса из{' '}
           <a className="login__link" href="https://console.green-api.com" target="_blank" rel="noreferrer">
             консоли GREEN-API
           </a>
         </p>
 
         <label className="login__field">
-          <span className="login__label">idInstance</span>
+          <span className="login__label">id Instance</span>
           <input
             className="login__input"
             value={idInstance}
@@ -81,7 +81,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           />
         </label>
         <label className="login__field">
-          <span className="login__label">apiTokenInstance</span>
+          <span className="login__label">API Token Instance</span>
           <input
             className="login__input"
             type="password"
@@ -91,10 +91,13 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             autoComplete="off"
           />
         </label>
-        <label className="login__field">
-          <span className="login__label">apiUrl</span>
-          <input className="login__input" type="url" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} />
-        </label>
+        <details className="login__advanced">
+          <summary className="login__advanced-toggle">Дополнительно</summary>
+          <label className="login__field">
+            <span className="login__label">apiUrl — адрес API из консоли, если отличается</span>
+            <input className="login__input" type="url" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} />
+          </label>
+        </details>
 
         {error && (
           <div className="login__error" role="alert">
@@ -102,7 +105,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           </div>
         )}
         <button type="submit" className="login__button" disabled={loading}>
-          {loading ? 'Проверка…' : 'Войти'}
+          {loading && <span className="login__spinner" aria-hidden="true" />}
+          {loading ? 'Проверяем…' : 'Войти'}
         </button>
       </form>
     </div>

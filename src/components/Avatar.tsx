@@ -1,4 +1,12 @@
-const COLORS = ['#e17076', '#7bc862', '#65aadd', '#a695e7', '#ee7aae', '#6ec9cb', '#faa774']
+// градиенты аватаров в духе MAX
+const GRADIENTS = [
+  'linear-gradient(135deg, #ffb36b, #ff6b6b)',
+  'linear-gradient(135deg, #7be08b, #29b36a)',
+  'linear-gradient(135deg, #6bd3ff, #2f86ff)',
+  'linear-gradient(135deg, #c39bff, #7a5cf0)',
+  'linear-gradient(135deg, #ff9bd0, #f0508f)',
+  'linear-gradient(135deg, #6fe3e0, #1fa5b3)',
+]
 
 function getInitials(title: string): string {
   const words = title.replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/).filter(Boolean)
@@ -11,10 +19,10 @@ function getInitials(title: string): string {
     .join('')
 }
 
-function getColor(title: string): string {
+function getBackground(title: string): string {
   let hash = 0
   for (const ch of title) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0
-  return COLORS[hash % COLORS.length]
+  return GRADIENTS[hash % GRADIENTS.length]
 }
 
 interface AvatarProps {
@@ -26,7 +34,7 @@ export function Avatar({ title, size = 54 }: AvatarProps) {
   return (
     <div
       className="avatar"
-      style={{ width: size, height: size, background: getColor(title), fontSize: size * 0.38 }}
+      style={{ width: size, height: size, background: getBackground(title), fontSize: size * 0.38 }}
       aria-hidden="true"
     >
       {getInitials(title)}

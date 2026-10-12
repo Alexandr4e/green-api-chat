@@ -12,12 +12,62 @@ export type ChatAction =
   | { type: 'addMessage'; message: Message; chatTitle?: string }
   | { type: 'updateMessage'; id: string; patch: Partial<Message> }
   | { type: 'renameChat'; from: string; to: string }
+  | { type: 'mergeChats'; chats: Chat[] }
+  /** Сообщения из журналов и истории; добавляются только в известные чаты */
+  | { type: 'addMessages'; messages: Message[] }
 
 export const emptyState: ChatState = { chats: [], messages: {}, activeChatId: null }
 
 function upsertMessage(list: Message[] = [], message: Message): Message[] {
   if (list.some((m) => m.id === message.id)) return list
   return [...list, message].sort((a, b) => a.timestamp - b.timestamp)
+}
+
+/** Телефон чата (только цифры): из getChats или из chatId вида "79991234567@c.us" */
+function chatPhone(chat: Chat): string | undefined {
+  return chat.phone ?? chat.phoneChatId?.replace(/\D/g, '')
+}
+
+/**
+ * Переносит чат и его сообщения на другой chatId: мессенджер может вернуть реальный chatId
+ * (например, "10000000") вместо "номер@c.us", по которому чат был создан.
+ */
+function renameChat(state: ChatState, from: string, to: string): ChatState {
+  if (from === to) return state
+  const source = state.chats.find((c) => c.chatId === from)
+  if (!source) return state
+  const target = state.chats.find((c) => c.chatId === to)
+  const merged: Chat = { ...(target ?? {}), ...source, chatId: to, phoneChatId: source.phoneChatId ?? from }
+  let list = state.messages[to] ?? []
+  for (const m of state.messages[from] ?? []) list = upsertMessage(list, { ...m, chatId: to })
+  const messages = { ...state.messages, [to]: list }
+  delete messages[from]
+  return {
+    // чат остаётся на месте источника в списке
+    chats: state.chats.filter((c) => c.chatId !== to).map((c) => (c.chatId === from ? merged : c)),
+    messages,
+    activeChatId: state.activeChatId === from ? to : state.activeChatId,
+  }
+}
+
+/** Объединяет список чатов с сервера (getChats) с локальными чатами */
+function mergeChats(state: ChatState, remote: Chat[]): ChatState {
+  let next = state
+  for (const chat of remote) {
+    if (!next.chats.some((c) => c.chatId === chat.chatId)) {
+      // чат, созданный по номеру, получает настоящий chatId с сервера
+      const byPhone = chat.phone && next.chats.find((c) => !c.phone && chatPhone(c) === chat.phone)
+      if (byPhone) next = renameChat(next, byPhone.chatId, chat.chatId)
+    }
+    const exists = next.chats.some((c) => c.chatId === chat.chatId)
+    next = {
+      ...next,
+      chats: exists
+        ? next.chats.map((c) => (c.chatId === chat.chatId ? { ...c, title: chat.title, phone: chat.phone ?? c.phone } : c))
+        : [...next.chats, chat],
+    }
+  }
+  return next
 }
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
@@ -54,25 +104,17 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const patched = withoutDup.map((m) => (m.id === action.id ? { ...m, ...action.patch } : m))
       return { ...state, messages: { ...state.messages, [chatId]: patched } }
     }
-    case 'renameChat': {
-      // Telegram может вернуть реальный chatId (например, "10000000") вместо "номер@c.us".
-      // Переносим чат и его сообщения на реальный chatId.
-      const { from, to } = action
-      if (from === to) return state
-      const source = state.chats.find((c) => c.chatId === from)
-      if (!source) return state
-      const target = state.chats.find((c) => c.chatId === to)
-      const merged: Chat = { ...(target ?? {}), ...source, chatId: to, phoneChatId: source.phoneChatId ?? from }
-      const chats = state.chats.filter((c) => c.chatId !== from && c.chatId !== to)
-      let list = state.messages[to] ?? []
-      for (const m of state.messages[from] ?? []) list = upsertMessage(list, { ...m, chatId: to })
-      const messages = { ...state.messages, [to]: list }
-      delete messages[from]
-      return {
-        chats: [merged, ...chats],
-        messages,
-        activeChatId: state.activeChatId === from ? to : state.activeChatId,
+    case 'renameChat':
+      return renameChat(state, action.from, action.to)
+    case 'mergeChats':
+      return mergeChats(state, action.chats)
+    case 'addMessages': {
+      const known = new Set(state.chats.map((c) => c.chatId))
+      const messages = { ...state.messages }
+      for (const m of action.messages) {
+        if (known.has(m.chatId)) messages[m.chatId] = upsertMessage(messages[m.chatId], m)
       }
+      return { ...state, messages }
     }
   }
 }

@@ -1,11 +1,10 @@
-import type { Message, NotificationBody, SenderData } from '../types'
+import type { HistoryMessage, Message, NotificationBody } from '../types'
 import { formatChatId } from './phone'
 
 const TEXT_WEBHOOKS = new Set(['incomingMessageReceived', 'outgoingMessageReceived', 'outgoingAPIMessageReceived'])
 
 export interface TextNotification {
   message: Message
-  sender: SenderData
   chatTitle: string
 }
 
@@ -20,7 +19,6 @@ export function parseTextNotification(body: NotificationBody): TextNotification 
 
   const incoming = body.typeWebhook === 'incomingMessageReceived'
   return {
-    sender,
     chatTitle: sender.senderContactName || sender.chatName || sender.senderName || formatChatId(sender.chatId),
     message: {
       id: body.idMessage,
@@ -30,5 +28,21 @@ export function parseTextNotification(body: NotificationBody): TextNotification 
       timestamp: body.timestamp ? body.timestamp * 1000 : Date.now(),
       status: incoming ? undefined : 'sent',
     },
+  }
+}
+
+const TEXT_TYPES = new Set(['textMessage', 'extendedTextMessage'])
+
+/** Преобразует сообщение из getChatHistory; нетекстовые сообщения пропускает */
+export function historyToMessage(item: HistoryMessage): Message | null {
+  if (!TEXT_TYPES.has(item.typeMessage) || typeof item.textMessage !== 'string') return null
+  const outgoing = item.type === 'outgoing'
+  return {
+    id: item.idMessage,
+    chatId: item.chatId,
+    text: item.textMessage,
+    outgoing,
+    timestamp: item.timestamp * 1000,
+    status: outgoing ? 'sent' : undefined,
   }
 }
